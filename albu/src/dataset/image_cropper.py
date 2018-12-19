@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 class ImageCropper:
     """
     generates crops from image
+    of size (target_rows, target_cols)
     """
     def __init__(self, img_rows, img_cols, target_rows, target_cols, pad):
         self.image_rows = img_rows

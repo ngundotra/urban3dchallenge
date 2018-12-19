@@ -13,6 +13,7 @@ ADD requirements.txt /opt
 RUN pip install -r /opt/requirements.txt
 RUN pip install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp35-cp35m-manylinux1_x86_64.whl
 RUN pip install torchvision
+RUN conda install opencv
 RUN mkdir -p /root/.torch/models
 RUN wget https://download.pytorch.org/models/resnet34-333f7ec4.pth -P /root/.torch/models
 
