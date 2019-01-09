@@ -106,10 +106,15 @@ class Estimator:
         meter = {k: 0 for k,v in metrics}
         meter['loss'] = 0
         for input, target in zip(inputs, targets):
-            input = torch.autograd.Variable(input.cuda(async=True), volatile=not training)
-            target = torch.autograd.Variable(target.cuda(async=True), volatile=not training)
-            output = self.model(input)
-            loss = self.criterion(output, target) / iter_size
+            input = torch.autograd.Variable(input.cuda(async=True)) 
+            target = torch.autograd.Variable(target.cuda(async=True))
+            if not training:
+                with torch.no_grad():
+                    output = self.model(input)
+                    loss = self.criterion(output, target) / iter_size
+            else:
+                output = self.model(input)
+                loss = self.criterion(output, target) / iter_size
             # loss /= batch_size
 
             if training:
