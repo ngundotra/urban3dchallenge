@@ -45,8 +45,6 @@ def get_saliency(model, input_tensor, truth, verbose=False):
     saliency = np.transpose(input_tensor.grad.data.cpu().numpy()[0], (1, 2, 0))
     abs_sal = np.abs(saliency).max(axis=2)
 #     abs_sal = np.abs(saliency)[...,3]
-    g_range = abs_sal.max() - abs_sal.min()
-    abs_sal /= g_range
     if verbose:
         if truth is None:
             raise ValueError("Need to pass in truth labels in range [0, 1].")
@@ -67,8 +65,10 @@ def get_saliency_big(model, input_tensor, truth, verbose=False):
     # Reconstruct from smaller portions
     up = np.concatenate((ul, ur), axis=1)
     down = np.concatenate((ll, lr), axis=1)
-    saliency = np.concatenate((up, down), axis=0)
-    return saliency
+    sal = np.concatenate((up, down), axis=0)
+    g_range = sal.max() - sal.min()
+    sal /= g_range
+    return sal
 
 def get_crops(img):
     "assumes img is 2048 and target is 1024"
