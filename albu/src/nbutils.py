@@ -79,8 +79,27 @@ def reconstruct(ul, ur, ll, lr):
     down = np.concatenate((ll, lr), axis=1)
     return np.concatenate((up, down), axis=0)
 
+def _mini_predict_on_file(model, img, dem_img, flips=flip.FLIP_FULL, channels=4):
+    """Handles logic of choosing which input tensor to create"""
+    if channels == 4:
+        input_tensor = make_input_tensor(img, dem_img)
+    elif channels == 3:
+        input_tensor = np.expand_dims(np.transpose(img, (2, 0, 1)), axis=0)
+    elif channels == 1:
+        input_tensor = np.expand_dims(np.expand_dims(dem_img,axis=0),axis=0)
+    with torch.no_grad():
+        input_tensor = torch.Tensor(input_tensor)
+        return predict(model, torch.autograd.Variable(input_tensor).cuda(), flips=flips)
+
 def predict_on_file(model, fname, crop=True, flips=flip.FLIP_FULL, channels=4):
-    """Predicts using RGB fname, loads in DTM+DSM data as well"""
+    """Predicts on 4 separate regions of the input file, then pieces them together if crop=True
+    Averages predictions on flips of each image based upon flip parameter
+    Chooses which input tensor to create depending upon number of channels
+
+    channels == 4 -- RGB+DSM
+    channels == 3 -- RGB
+    channels == 1 -- DSM"""
+
     original_img = load_img(fname) / 255.0
     dsm = georaster.SingleBandRaster(fname.replace('RGB', 'DSM')).r
     dtm = georaster.SingleBandRaster(fname.replace('RGB', 'DTM')).r
@@ -88,24 +107,11 @@ def predict_on_file(model, fname, crop=True, flips=flip.FLIP_FULL, channels=4):
     pred_array = []
     if crop:
         for img, dem_img in zip(get_crops(original_img), get_crops(original_dem)):
-            if channels == 4:
-                input_tensor = make_input_tensor(img, dem_img)
-            else:
-                input_tensor = np.expand_dims(np.transpose(img, (2, 0, 1)), axis=0)
-            with torch.no_grad():
-                input_tensor = torch.Tensor(input_tensor)
-                out = predict(model, torch.autograd.Variable(input_tensor).cuda(), flips=flips)
-
+            out = _mini_predict_on_file(model, img, dem_img, channels=channels, flips=flips)
             pred_array.append(np.transpose((out[0]*255).astype(np.uint8), (1, 2, 0)).squeeze())
         return reconstruct(*pred_array)
     else:
-        if channels == 4:
-            input_tensor = make_input_tensor(original_img, original_dem)
-        else:
-            input_tensor = np.expand_dims(np.transpose(original_img, (2, 0, 1)), axis=0)
-        with torch.no_grad():
-            input_tensor = torch.Tensor(input_tensor)
-            out = predict(model, torch.autograd.Variable(input_tensor).cuda(), flips=flips)
+        out = _mini_predict_on_file(model, original_img, original_dem, flips=flips, channels=channels)
         return np.transpose((out[0]*255).astype(np.uint8), (1, 2, 0)).squeeze()
 
 def plot_poly(contours, ax, coord_fn, color):
