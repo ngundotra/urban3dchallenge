@@ -1,0 +1,10 @@
+Residential:0
+Pasture:1
+Industrial:2
+HerbaceousVegetation:3
+PermanentCrop:4
+SeaLake:5
+River:6
+AnnualCrop:7
+Forest:8
+Highway:9
