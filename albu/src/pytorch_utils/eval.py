@@ -132,7 +132,7 @@ class Evaluator:
             for data in pbar:
                 self.show_mask = 'mask' in data and self.show_mask
                 if 'mask' not in data:
-                    self.need_dice = False
+                        self.need_dice = False
 
                 predicted = self.predict_samples(model, data)
                 self.process_data(predicted, model, data, prefix=prefix)

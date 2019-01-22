@@ -1,4 +1,5 @@
 {
+  "sal_map": true,
   "batch_size": 9,
   "iter_size": 3,
   "dataset_path": "../../Train",

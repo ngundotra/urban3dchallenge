@@ -21,7 +21,8 @@ Config = namedtuple("Config", [
     "test_pad",
     "train_pad",
     "results_dir",
-    "iter_size"
+    "iter_size",
+    "sal_map"
 ])
 
 
