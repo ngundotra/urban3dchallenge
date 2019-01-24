@@ -3,6 +3,7 @@ import os
 
 from dataset.reading_image_provider import ReadingImageProvider
 from dataset.urban3d_dem_image import TiffDemImageType
+from dataset.salmap_image import SalImageType
 from pytorch_utils.concrete_eval import GdalFullEvaluator
 from utils import update_config
 # torch.backends.cudnn.benchmark = True
@@ -33,21 +34,31 @@ paths_testing = {
     'images': test_dir,
     'dems': test_dir,
     'dtms': test_dir,
+    'sal': test_dir
 }
 fn_mapping = {
     'masks': lambda name: name.replace('RGB', 'GTI'),
     'dems': lambda name: name.replace('RGB', 'DSM'),
-    'dtms': lambda name: name.replace('RGB', 'DTM')
+    'dtms': lambda name: name.replace('RGB', 'DTM'),
+    'sal': lambda name: name[:-7] + 'SAL.npy'
 }
 
 paths_testing = {k: os.path.join(config.dataset_path, v) for k,v in paths_testing.items()}
+
+class TiffSalImageTypeNoPad(SalImageType):
+    def finalyze(self, data):
+        return data
+
 
 class TiffDemImageTypeNopad(TiffDemImageType):
     def finalyze(self, data):
         return data
 
+
 def predict():
     dtype = TiffDemImageTypeNopad
+    if 'sal_map' in cfg and cfg['sal_map'] is True:
+        dtype = TiffSalImageTypeNoPad
     ds = ReadingImageProvider(dtype, paths_testing, fn_mapping, image_suffix='RGB')
     folds = [([], list(range(len(ds)))) for i in range(5)]
 
