@@ -1,0 +1,5 @@
+model overall-F1-score
+train-out 902340.7910865347
+test-out 844472.3944836038
+sal-model-train-out 890116.8968660727
+sal-model-test-out 873082.7935277947
