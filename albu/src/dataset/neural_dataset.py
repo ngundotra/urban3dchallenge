@@ -74,6 +74,7 @@ class SequentialDataset(Dataset):
         self.good_tiles = []
         self.init_good_tiles()
         self.keys.update({'sy', 'sx'})
+        print(self.transforms)
 
     def init_good_tiles(self):
         self.good_tiles = []
@@ -94,10 +95,14 @@ class SequentialDataset(Dataset):
             return None
         im_idx, sx, sy = self.good_tiles[idx]
         item = self.image_provider[im_idx]
+        print("out of Image Provider:", item)
 
         im = self.cropper.crop_image(item.image, sx, sy)
+        print("out of cropper:", im.shape)
 
         im = self.transforms(im)
+        # im = self.transforms(np.transpose(item.image, (2, 0, 1)))
+        print("out of transform:", im.shape)
         return {'image': im, 'startx': sx, 'starty': sy, 'image_name': item.fn}
 
     def __len__(self):
@@ -122,4 +127,5 @@ class ValDataset(SequentialDataset):
         # cv2.imshow('m', mask)
         # cv2.waitKey()
         im, mask = self.transforms(im, mask)
+        print(im.shape)
         return {'image': im, 'mask': mask, 'startx': sx, 'starty': sy, 'image_name': item.fn}
