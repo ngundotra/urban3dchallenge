@@ -4,6 +4,7 @@ import os
 from dataset.reading_image_provider import ReadingImageProvider
 from dataset.urban3d_dem_image import TiffDemImageType
 from dataset.salmap_image import SalImageType
+from dataset.tiff_image import TiffImageType
 from pytorch_utils.concrete_eval import GdalFullEvaluator
 from utils import update_config
 # torch.backends.cudnn.benchmark = True
@@ -45,6 +46,11 @@ fn_mapping = {
 
 paths_testing = {k: os.path.join(config.dataset_path, v) for k,v in paths_testing.items()}
 
+class TiffImageTypeNoPad(TiffImageType):
+    def finalyze(self, data):
+        return data
+
+
 class TiffSalImageTypeNoPad(SalImageType):
     def finalyze(self, data):
         return data
@@ -59,6 +65,8 @@ def predict():
     dtype = TiffDemImageTypeNopad
     if 'sal_map' in cfg and cfg['sal_map'] is True:
         dtype = TiffSalImageTypeNoPad
+    if cfg['num_channels'] == 3:
+        dtype = TiffImageTypeNoPad
     ds = ReadingImageProvider(dtype, paths_testing, fn_mapping, image_suffix='RGB')
     folds = [([], list(range(len(ds)))) for i in range(5)]
 

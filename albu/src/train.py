@@ -61,27 +61,34 @@ def train_stage0():
     train(ds, folds, config, num_workers=num_workers, transforms=augment_flips_color)
 
 
-def train_stage1(sal_map:bool):
+def train_stage1(sal_map:bool, three=False):
     """
     main training stage with dtm/dsm data
+    three = True ===> use only RGB for training
+    updates channels from warm start with only RGB to final number of channels in config.num_channels
     """
     im_type = TiffDemImageType
     if sal_map:
         im_type = SalImageType
+    if three:
+        im_type = TiffImageType
     ds = ReadingImageProvider(im_type, paths, fn_mapping, image_suffix='RGB')
 
     folds = get_folds(ds, 5)
     num_workers = 0 if os.name == 'nt' else 8
-    train(ds, folds, config, num_workers=num_workers, transforms=augment_flips_color, num_channels_changed=True)
+    train(ds, folds, config, num_workers=num_workers, transforms=augment_flips_color, num_channels_changed=not three)
 
 
-def train_stage2(sal_map:bool):
+def train_stage2(sal_map:bool, three=False):
     """
     train with other loss function
+    three = True ===> use only RGB for training
     """
     im_type = TiffDemImageType
     if sal_map:
         im_type = SalImageType
+    if three:
+        im_type = TiffImageType
     ds = ReadingImageProvider(im_type, paths, fn_mapping, image_suffix='RGB')
 
     folds = get_folds(ds, 5)
@@ -90,13 +97,14 @@ def train_stage2(sal_map:bool):
 
 
 if __name__ == "__main__":
+    three = (config.num_channels == 3)
     num_epochs = config.nb_epoch
     config = update_config(config, num_channels=3, nb_epoch=5)
     print("start training stage 1/3")
     train_stage0()
     print("start training stage 2/3")
-    config = update_config(config, num_channels=4, nb_epoch=num_epochs)
-    train_stage1(config.sal_map)
+    config = update_config(config, num_channels=config.num_channels, nb_epoch=num_epochs)
+    train_stage1(config.sal_map, three=three)
     print("start training stage 3/3")
     config = update_config(config, loss=config.loss + '_w', nb_epoch=num_epochs + 2)
-    train_stage2(config.sal_map)
+    train_stage2(config.sal_map, three=three)
