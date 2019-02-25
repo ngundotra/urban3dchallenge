@@ -95,14 +95,11 @@ class SequentialDataset(Dataset):
             return None
         im_idx, sx, sy = self.good_tiles[idx]
         item = self.image_provider[im_idx]
-        print("out of Image Provider:", item)
 
         im = self.cropper.crop_image(item.image, sx, sy)
-        print("out of cropper:", im.shape)
 
         im = self.transforms(im)
         # im = self.transforms(np.transpose(item.image, (2, 0, 1)))
-        print("out of transform:", im.shape)
         return {'image': im, 'startx': sx, 'starty': sy, 'image_name': item.fn}
 
     def __len__(self):

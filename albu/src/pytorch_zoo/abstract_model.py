@@ -83,13 +83,16 @@ class EncoderDecoder(AbstractModel):
     def forward(self, x):
         # Encoder
         enc_results = []
-        for stage in self.encoder_stages:
+        for i, stage in enumerate(self.encoder_stages):
             x = stage(x)
+            # print("encoder stage:", i, x.shape)
             enc_results.append(x.clone())
 
+        # Decoder stages
         for idx, bottleneck in enumerate(self.bottlenecks):
             rev_idx = - (idx + 1)
             x = self.decoder_stages[rev_idx](x)
+            # print("decoder statge: ", idx, x.shape)
             x = bottleneck(x, enc_results[rev_idx - 1])
 
         x = self.last_upsample(x)

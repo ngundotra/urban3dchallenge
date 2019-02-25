@@ -5,6 +5,7 @@ from dataset.reading_image_provider import ReadingImageProvider
 from dataset.urban3d_dem_image import TiffDemImageType
 from dataset.salmap_image import SalImageType
 from dataset.tiff_image import TiffImageType
+from dataset.spacenet_image import TiffSpacenetImageType 
 from pytorch_utils.concrete_eval import GdalFullEvaluator
 from utils import update_config
 # torch.backends.cudnn.benchmark = True
@@ -20,6 +21,7 @@ parser.add_argument('config_path')
 parser.add_argument('train_data_path')
 parser.add_argument('test_data_path')
 parser.add_argument('output_file')
+parser.add_argument('spacenet')
 args = parser.parse_args()
 with open(args.config_path, 'r') as f:
     cfg = json.load(f)
@@ -28,6 +30,7 @@ with open(args.config_path, 'r') as f:
     out_file = args.output_file
     dataset_path, test_dir = os.path.split(test_data_path)
     cfg['dataset_path'] = dataset_path
+args.spacenet = args.spacenet.lower() == 'true'
 config = Config(**cfg)
 
 paths_testing = {
@@ -43,6 +46,15 @@ fn_mapping = {
     'dtms': lambda name: name.replace('RGB', 'DTM'),
     'sal': lambda name: name[:-7] + 'SAL.npy'
 }
+
+if args.spacenet:
+    paths_testing = {
+        'images': test_dir + '/RGB-PanSharpen/',
+        'masks': test_dir + '/Shanghai-Segs/'
+        }
+    fn_mapping = {
+            'masks': lambda name: 'buildings_AOI_4_Shanghai' + name.split('_')[-1] + '.geojson.npy', # FILL IN
+        }
 
 paths_testing = {k: os.path.join(config.dataset_path, v) for k,v in paths_testing.items()}
 
@@ -60,14 +72,23 @@ class TiffDemImageTypeNopad(TiffDemImageType):
     def finalyze(self, data):
         return data
 
+class TiffSpacenetImageTypeNoPad(TiffSpacenetImageType):
+    def finalyze(self, data):
+        return data
+
 
 def predict():
+    suffix = 'RGB'
     dtype = TiffDemImageTypeNopad
     if 'sal_map' in cfg and cfg['sal_map'] is True:
         dtype = TiffSalImageTypeNoPad
     if cfg['num_channels'] == 3:
         dtype = TiffImageTypeNoPad
-    ds = ReadingImageProvider(dtype, paths_testing, fn_mapping, image_suffix='RGB')
+    if args.spacenet:
+        dtype = TiffSpacenetImageTypeNoPad
+        suffix = 'tif'
+
+    ds = ReadingImageProvider(dtype, paths_testing, fn_mapping, image_suffix=suffix)
     folds = [([], list(range(len(ds)))) for i in range(5)]
 
     num_workers = 0 if os.name == 'nt' else 4
@@ -77,11 +98,21 @@ def predict():
 
 
 if __name__ == "__main__":
-    config = update_config(config, img_rows=2048, img_cols=2048, target_rows=2048, target_cols=2048, num_channels=4)
+    if args.spacenet:
+        print("Spacenet is true")
+        print(os.path.join(config.results_dir, 'results', config.folder, 'merged'), test_data_path, out_file)
+
+    print(config.num_channels)
+    in_shape = 2048
+    test_shape = 2048
+    if args.spacenet:
+        in_shape = 650
+        test_shape = 512
+    config = update_config(config, img_rows=in_shape, img_cols=in_shape, target_rows=test_shape, target_cols=test_shape, num_channels=config.num_channels)
     print("predicting stage 1/3")
     predict()
 
     print("predicting stage 2/3")
     merge_tiffs(os.path.join(config.results_dir, 'results', config.folder))
     print("predicting stage 3/3")
-    make_submission(os.path.join(config.results_dir, 'results', config.folder, 'merged'), test_data_path, out_file)
+    make_submission(os.path.join(config.results_dir, 'results', config.folder, 'merged'), test_data_path, out_file, spacenet=args.spacenet)

@@ -172,7 +172,6 @@ class Evaluator:
     def predict_samples(self, model, data):
         with torch.no_grad():
             samples = torch.autograd.Variable(data['image']).cuda()
-            print(samples.shape)
             predicted = predict(model, samples, flips=self.flips)
         return predicted
 

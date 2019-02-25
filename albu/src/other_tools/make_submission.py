@@ -85,7 +85,7 @@ def my_watershed(mask1, mask2):
     return labels
 
 
-def make_submission(prediction_dir, data_dir, submission_file):
+def make_submission(prediction_dir, data_dir, submission_file, spacenet=False):
     """
     double thresholding with watershed
     after it make rle encoded image for submission
@@ -98,14 +98,18 @@ def make_submission(prediction_dir, data_dir, submission_file):
     for f in tqdm.tqdm(predictions):
         if 'xml' in f:
             continue
-        dsm_ds = gdal.Open(os.path.join(data_dir, f.replace('RGB', 'DSM')), gdal.GA_ReadOnly)
-        band_dsm = dsm_ds.GetRasterBand(1)
-        nodata = band_dsm.GetNoDataValue()
-        dsm = band_dsm.ReadAsArray()
-        tile_id = f.split('_RGB.tif')[0]
+        if not spacenet:
+            dsm_ds = gdal.Open(os.path.join(data_dir, f.replace('RGB', 'DSM')), gdal.GA_ReadOnly)
+            band_dsm = dsm_ds.GetRasterBand(1)
+            nodata = band_dsm.GetNoDataValue()
+            dsm = band_dsm.ReadAsArray()
+            tile_id = f.split('_RGB.tif')[0]
+        if spacenet:
+            tile_id = f.split('_img')[-1].strip('.tif')
         mask_ds = gdal.Open(os.path.join(prediction_dir, f))
         mask_img = mask_ds.ReadAsArray()
-        mask_img[dsm==nodata] = 0
+        if not spacenet:
+            mask_img[dsm==nodata] = 0
 
         img_copy = np.copy(mask_img)
         img_copy[mask_img <= threshold + 0.4] = 0

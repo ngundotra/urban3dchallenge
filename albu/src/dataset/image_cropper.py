@@ -13,7 +13,6 @@ class ImageCropper:
         self.image_cols = img_cols
         self.target_rows = target_rows
         self.target_cols = target_cols
-        print("tr:", self.target_rows, "tc:", target_cols)
         self.pad = pad
         self.use_crop = (img_rows != target_rows) or (img_cols != target_cols)
         self.starts_y = self.sequential_starts(axis=0) if self.use_crop else [0]
@@ -27,7 +26,6 @@ class ImageCropper:
         return x, y
 
     def crop_image(self, image, x, y):
-        print("pre crop:", image.shape, x, y)
         return image[y: y+self.target_rows, x: x+self.target_cols,...] if self.use_crop else image
 
     def sequential_starts(self, axis=0):
