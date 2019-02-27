@@ -90,6 +90,9 @@ def make_submission(prediction_dir, data_dir, submission_file, spacenet=False):
     double thresholding with watershed
     after it make rle encoded image for submission
     """
+    urban3d = dataset == 'urban3d'
+    spacenet = dataset == 'spacenet'
+    crowdai = dataset == 'crowdai'
     threshold = 0.3
     f_submit = open(submission_file, "w")
     strings = []
@@ -98,17 +101,22 @@ def make_submission(prediction_dir, data_dir, submission_file, spacenet=False):
     for f in tqdm.tqdm(predictions):
         if 'xml' in f:
             continue
-        if not spacenet:
+        if urban3d:
             dsm_ds = gdal.Open(os.path.join(data_dir, f.replace('RGB', 'DSM')), gdal.GA_ReadOnly)
             band_dsm = dsm_ds.GetRasterBand(1)
             nodata = band_dsm.GetNoDataValue()
             dsm = band_dsm.ReadAsArray()
             tile_id = f.split('_RGB.tif')[0]
-        if spacenet:
+        elif spacenet:
             tile_id = f.split('_img')[-1].strip('.tif')
-        mask_ds = gdal.Open(os.path.join(prediction_dir, f))
-        mask_img = mask_ds.ReadAsArray()
-        if not spacenet:
+        
+        if not crowdai:
+            mask_ds = gdal.Open(os.path.join(prediction_dir, f))
+            mask_img = mask_ds.ReadAsArray()
+        else:
+            mask_img = np.load(os.path.join(prediction_dir, f))
+            mask_img = cv2.resize(mask_img, (256, 256))
+        if urban3d:
             mask_img[dsm==nodata] = 0
 
         img_copy = np.copy(mask_img)

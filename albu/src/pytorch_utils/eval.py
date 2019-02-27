@@ -65,7 +65,7 @@ class Evaluator:
     """
     base class for inference, supports different strategy - full image or crops, also supports different image types
     """
-    def __init__(self, config, ds, folds, test=False, flips=0, num_workers=0, border=12):
+    def __init__(self, config, ds, folds, test=False, flips=0, num_workers=0, border=12, crowdai=False):
         self.config = config
         self.ds = ds
         self.folds = folds
@@ -84,6 +84,8 @@ class Evaluator:
         self.show_mask = config.dbg
         self.need_dice = False
         self.dice = []
+        # Flag for how to save predictions
+        self.crowdai = True
 
         if self.config.save_images:
             os.makedirs(self.config.results_dir, exist_ok=True)

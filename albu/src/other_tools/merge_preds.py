@@ -10,7 +10,17 @@ def merge_tiffs(root):
     merge folds
     """
     os.makedirs(os.path.join(root, 'merged'), exist_ok=True)
-    prob_files = {f for f in os.listdir(root) if os.path.splitext(f)[1] in ['.tif', '.tiff']}
+    # Check to see if any of first 20 files listed are crowdai outputs
+    merge_crowdai = False
+    for f in os.listdir(root)[:20]:
+        if f.endswith('npy'):
+            merge_crowdai = True 
+
+    ext = ['.tif', '.tiff']
+    if merge_crowdai:
+        ext = ['.npy']
+
+    prob_files = {f for f in os.listdir(root) if os.path.splitext(f)[1] in ext}
     unfolded = {f[6:] for f in prob_files if f.startswith('fold')}
     if not unfolded:
         unfolded = prob_files
@@ -18,20 +28,27 @@ def merge_tiffs(root):
     for prob_file in tqdm.tqdm(unfolded):
         probs = []
         for fold in range(5):
-            prob = gdal.Open(os.path.join(root, 'fold{}_'.format(fold) + prob_file), gdal.GA_ReadOnly)
-            geotrans = prob.GetGeoTransform()
-            prob_arr = prob.ReadAsArray()
+            path = os.path.join(root, 'fold{}_'.format(fold) + prob_file)
+            if merge_crowdai:
+                prob_arr = np.load(path)
+            else:
+                prob = gdal.Open(path, gdal.GA_ReadOnly)
+                geotrans = prob.GetGeoTransform()
+                prob_arr = prob.ReadAsArray()
             probs.append(prob_arr)
         prob_arr = np.mean(probs, axis=0)
 
         res_path_geo = os.path.join(root, 'merged', prob_file)
-        driver = gdal.GetDriverByName('GTiff')
-        outRaster = driver.Create(res_path_geo, prob_arr.shape[1], prob_arr.shape[0], 1, gdal.GDT_Float32)
-        outRaster.SetGeoTransform(geotrans)
-        CopyDatasetInfo(prob, outRaster)
-        outband = outRaster.GetRasterBand(1)
-        outband.WriteArray(prob_arr)
-        outRaster.FlushCache()
+        if merge_crowdai:
+            np.save(res_path_geo, prob_arr)
+        else:
+            driver = gdal.GetDriverByName('GTiff')
+            outRaster = driver.Create(res_path_geo, prob_arr.shape[1], prob_arr.shape[0], 1, gdal.GDT_Float32)
+            outRaster.SetGeoTransform(geotrans)
+            CopyDatasetInfo(prob, outRaster)
+            outband = outRaster.GetRasterBand(1)
+            outband.WriteArray(prob_arr)
+            outRaster.FlushCache()
 
 def merge_tiffs_defferent_folders(roots, res):
     """
