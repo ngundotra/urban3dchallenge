@@ -29,4 +29,4 @@ for img_id in tqdm(image_ids):
         # so we first convert it to a shape of (300, 300)
         m = m.reshape((img['height'], img['width']))
         lbl = lbl + m
-    np.save(crowddir+'labels/'+"{:0=12}.npy".format(img_id), m)
+    np.save(crowddir+'labels/'+"{:0=12}.npy".format(img_id), lbl)
