@@ -65,7 +65,7 @@ def get_training_mappings(data_info):
             'masks': os.path.join(data_dir, 'Shanghai-Segs/')
             }
         fn_mapping = {
-                'masks': lambda name: 'buildings_AOI_4_Shanghai' + name.split('_')[-1] + '.geojson.npy', # FILL IN
+                'masks': lambda name: 'buildings_AOI_4_Shanghai_' + name.split('_')[-1].replace("tif", 'geojson.npy'), # FILL IN
             }
         image_suffix = 'tif'
     elif ds_name == 'crowdai':
@@ -86,13 +86,14 @@ def get_training_mappings(data_info):
 data_infos = [get_training_mappings(data) for data in datasets]
 make_mixed_ds = lambda: MixedReadingImageProvider(data_infos)
 
+FOLDS = 5
 def train_stage0():
     """
     heat up weights for 5 epochs
     """
     ds = make_mixed_ds()
 
-    folds = get_folds(ds, 2)
+    folds = get_folds(ds, FOLDS)
     num_workers = 0 if os.name == 'nt' else 8
     train(ds, folds, config, num_workers=num_workers, transforms=augment_flips_color)
 
@@ -105,7 +106,7 @@ def train_stage1(sal_map:bool, three=False):
     """
     ds = make_mixed_ds()
 
-    folds = get_folds(ds, 2)
+    folds = get_folds(ds, FOLDS)
     num_workers = 0 if os.name == 'nt' else 8
     train(ds, folds, config, num_workers=num_workers, transforms=augment_flips_color, num_channels_changed=not three)
 
@@ -117,7 +118,7 @@ def train_stage2(sal_map:bool, three=False):
     """
     ds = make_mixed_ds()
 
-    folds = get_folds(ds, 2)
+    folds = get_folds(ds, FOLDS)
     num_workers = 0 if os.name == 'nt' else 8
     train(ds, folds, config, num_workers=num_workers, transforms=augment_flips_color)
 

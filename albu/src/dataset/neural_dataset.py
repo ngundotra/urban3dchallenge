@@ -5,6 +5,7 @@ import numpy as np
 from pytorch_utils.transforms import ToTensor
 from dataset.abstract_image_provider import AbstractImageProvider
 from .image_cropper import ImageCropper
+from .reading_image_provider import ReadingImageProvider, MixedReadingImageProvider
 
 
 class Dataset:
@@ -44,18 +45,22 @@ class TrainDataset(Dataset):
         im_idx = self.image_indexes[idx % len(self.image_indexes)]
 
         item = self.image_provider[im_idx]
-        sx, sy = self.cropper.random_crop_coords()
-        if self.cropper.use_crop and self.image_provider.has_alpha:
-            for i in range(10):
-                alpha = self.cropper.crop_image(item.alpha, sx, sy)
-                if np.mean(alpha) > 5:
-                    break
-                sx, sy = self.cropper.random_crop_coords()
-            else:
-                return self.__getitem__(random.randint(0, len(self.image_indexes)))
+        if type(self.image_provider) == ReadingImageProvider or self.image_provider.use_crop(im_idx):
+            sx, sy = self.cropper.random_crop_coords()
+            if self.cropper.use_crop and self.image_provider.has_alpha:
+                for i in range(10):
+                    alpha = self.cropper.crop_image(item.alpha, sx, sy)
+                    if np.mean(alpha) > 5:
+                        break
+                    sx, sy = self.cropper.random_crop_coords()
+                else:
+                    return self.__getitem__(random.randint(0, len(self.image_indexes)))
 
-        im = self.cropper.crop_image(item.image, sx, sy)
-        mask = self.cropper.crop_image(item.mask, sx, sy)
+            im = self.cropper.crop_image(item.image, sx, sy)
+            mask = self.cropper.crop_image(item.mask, sx, sy)
+        else:
+            im = item.image
+            mask = item.mask
         im, mask = self.transforms(im, mask)
         # cv2.imshow('w', np.moveaxis(im, 0, -1)[...,:3])
         # cv2.imshow('m', np.squeeze(mask))
@@ -64,6 +69,18 @@ class TrainDataset(Dataset):
 
     def __len__(self):
         return len(self.image_indexes) * max(self.config.epoch_size, 1) # epoch size is len images
+    
+    def is_mixed(self):
+        return type(self.image_provider) == MixedReadingImageProvider
+
+    def end_batch(self):
+        """Cycles between the different datasets to provide from"""
+        if self.is_mixed():
+            splits = self.image_provider.get_splits()
+            # s = np.random.choice(len(self.image_provider.ds_providers), p=np.array(splits)/len(self.image_provider)) 
+            s = np.random.choice(len(self.image_provider.ds_providers))
+            self.image_provider.set_split(s)
+            print("New split is at:", self.image_provider.ds_idx)
 
 class SequentialDataset(Dataset):
     """

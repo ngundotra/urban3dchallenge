@@ -6,17 +6,17 @@
     {
         "name": "urban3d",
         "dataset_path": "../../Train",
-        "limit": 0.25
+        "limit": 9
     },
     {
         "name": "spacenet",
         "dataset_path": "/datasets/Shanghai/AOI_4_Shanghai_Train/",
-        "limit": 0.25
+        "limit": 27
     },
     {
         "name": "crowdai",
         "dataset_path": "/datasets/CrowdAI/Train/",
-        "limit": 0.25
+        "limit": 81
     }
   ],
   "dataset_path": "",
@@ -31,7 +31,7 @@
   "train_pad": 0,
   "epoch_size": 16,
   "predict_batch_size": 2,
-  "results_dir": "results-RGB",
+  "results_dir": "results-RGB-mixed",
   "save_images": true,
   "target_cols": 1024,
   "target_rows": 1024,

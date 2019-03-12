@@ -14,7 +14,7 @@ class CrowdAIImageType(AbstractImageType):
     """
     def __init__(self, paths, fn, fn_mapping, has_alpha):
         super().__init__(paths, fn, fn_mapping, has_alpha)
-        self.fn_mapping = lambda x: x.replace('jpg', 'npy')
+        self.fn_mapping = {'masks': lambda x: x.replace('jpg', 'npy')}
         self.src_ds = None
         self.mask_ds = None
 

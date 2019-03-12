@@ -13,6 +13,8 @@ from typing import Type
 from dataset.neural_dataset import TrainDataset, ValDataset
 from .loss import dice_round, dice, BCEDiceLoss, BCEDiceLossWeighted
 from .callbacks import ModelSaver, TensorBoard, CheckpointSaver, Callbacks, StepLR
+from dataset.reading_image_provider import MixedReadingImageProvider
+
 from pytorch_zoo import unet
 import numpy as np
 
@@ -108,6 +110,7 @@ class Estimator:
         for input, target in zip(inputs, targets):
             input = torch.autograd.Variable(input.cuda(async=True)) 
             target = torch.autograd.Variable(target.cuda(async=True))
+            print("input shape is:", input.shape, "target shape is:", target.shape)
             if not training:
                 with torch.no_grad():
                     output = self.model(input)
@@ -186,6 +189,9 @@ class PytorchTrain:
             pbar.set_postfix(**{k: "{:.5f}".format(v / (i + 1)) for k, v in avg_meter.items()})
 
             self.callbacks.on_batch_end(i)
+            # SUPER IMPORTANT for MixedReadingImageProviders
+            # This allows the mixed providers to switch the dataset it's providing from
+            # loader.dataset.end_batch()
         return {k: v / len(loader) for k, v in avg_meter.items()}
 
     def _make_step(self, data, training):
@@ -252,15 +258,18 @@ def train(ds, folds, config, num_workers=0, transforms=None, skip_folds=None, nu
                                callbacks=callbacks,
                                hard_negative_miner=None)
 
+        if type(ds) == MixedReadingImageProvider:
+            ds.set_batch_size(config.batch_size)
+            shuffle = False
         train_loader = PytorchDataLoader(TrainDataset(ds, train_idx, config, transforms=transforms),
                                          batch_size=config.batch_size,
-                                         shuffle=True,
+                                         shuffle=shuffle,
                                          drop_last=True,
                                          num_workers=num_workers,
                                          pin_memory=True)
         val_loader = PytorchDataLoader(ValDataset(ds, val_idx, config, transforms=None),
                                        batch_size=config.batch_size,
-                                       shuffle=False,
+                                       shuffle=shuffle,
                                        drop_last=False,
                                        num_workers=num_workers,
                                        pin_memory=True)

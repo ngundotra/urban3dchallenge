@@ -73,8 +73,8 @@ class TiffSpacenetImageType(AbstractImageType):
     def read_mask(self):
         if self.mask_ds is None:
             self.mask_ds = np.load(os.path.join(self.paths['masks'], self.fn_mapping['masks'](self.fn)))
-        mask = (mask > 0).astype(np.uint8) * 255
-        return self.finalyze(mask)
+        self.mask_ds = (self.mask_ds > 0).astype(np.uint8) * 255
+        return self.finalyze(self.mask_ds)
 
     def finalyze(self, data):
         return self.reflect_border(data)
