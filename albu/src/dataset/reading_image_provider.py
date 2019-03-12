@@ -37,9 +37,12 @@ class ReadingImageProvider(AbstractImageProvider):
         # ah i see, this is because he's recreating the whole input system from the RGB file
         # and then linking the DSM/DTM/GT files with the same name, classico
         return len(self.im_names)
+    
+    def is_mixed(self):
+        return False
 
 
-class MixedReadingImageProvider(ReadingImageProvider):
+class MixedReadingImageProvider():
     """Class explicity for providing a mixed batch of images, shuffled randomly"""
     def __init__(self, datasets):
         """The datasets argument should be a dictionary of arguments that we can directly create
@@ -80,6 +83,9 @@ class MixedReadingImageProvider(ReadingImageProvider):
             if item < total and ds.image_type == TiffImageType:
                 return True
         return False
+    
+    def is_mixed(self):
+        return True
 
     def __len__(self):
         return sum([len(ds) for ds in self.ds_providers])

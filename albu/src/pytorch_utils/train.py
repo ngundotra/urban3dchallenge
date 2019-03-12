@@ -194,6 +194,40 @@ class PytorchTrain:
             # loader.dataset.end_batch()
         return {k: v / len(loader) for k, v in avg_meter.items()}
 
+    def _run_one_epoch_mixed(self, epoch, loaders, training=True):
+        """Switch between loaders for training, lord help me for validation...."""
+        pbars = []
+        counts = []
+        for idx, load in enumerate(loaders):
+            pbars.append(tqdm(enumerate(loader), total=len(loader), desc="Epoch {}{}-{}".format(epoch, ' eval' if not training else "", idx), ncols=0))
+            counts.append(0)
+
+        to_choose = [pbars[i] if counts[i] < len(pbars[i]) for i in range(len(pbars))]
+        actual_idx = 0
+        while len(to_choose) > 0:
+            curr_pbar = np.random.choice(to_choose)
+            data = next(curr_pbar)
+
+            self.callbacks.on_batch_begin(actual_idx)
+
+            meter, ypreds = self._make_step(data, training)
+            for k, val in meter.items():
+                avg_meter[k] += val
+
+            if training:
+                if self.hard_negative_miner is not None:
+                    self.hard_negative_miner.update_cache(meter, data)
+                    if self.hard_negative_miner.need_iter():
+                        self._make_step(self.hard_negative_miner.cache, training)
+                        self.hard_negative_miner.invalidate_cache()
+
+            pbar.set_postfix(**{k: "{:.5f}".format(v / (actual_idx + 1)) for k, v in avg_meter.items()})
+
+            self.callbacks.on_batch_end(actual_idx)
+            # SUPER IMPORTANT for MixedReadingImageProviders
+            # This allows the mixed providers to switch the dataset it's providing from
+            # loader.dataset.end_batch()
+
     def _make_step(self, data, training):
         images = data['image']
         ytrues = data['mask']
@@ -202,6 +236,9 @@ class PytorchTrain:
 
         return meter, ypreds
 
+    def switch_ds():
+        if self.mixed_ds():
+            self.ds_idx = np.random.choice(self.)
     def fit(self, train_loader, val_loader, nb_epoch):
         self.callbacks.on_train_begin()
 
