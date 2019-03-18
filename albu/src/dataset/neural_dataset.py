@@ -6,6 +6,7 @@ from pytorch_utils.transforms import ToTensor
 from dataset.abstract_image_provider import AbstractImageProvider
 from .image_cropper import ImageCropper
 from .reading_image_provider import ReadingImageProvider, MixedReadingImageProvider
+from dataset.tiff_image import TiffImageType
 
 
 class Dataset:
@@ -45,7 +46,9 @@ class TrainDataset(Dataset):
         im_idx = self.image_indexes[idx % len(self.image_indexes)]
 
         item = self.image_provider[im_idx]
-        if type(self.image_provider) == ReadingImageProvider or self.image_provider.use_crop(im_idx):
+        # The following line allows certain ImageProviders to avoid cropping their images
+        if self.image_provider.image_type == TiffImageType:
+            print("croppin'!")
             sx, sy = self.cropper.random_crop_coords()
             if self.cropper.use_crop and self.image_provider.has_alpha:
                 for i in range(10):
@@ -61,17 +64,16 @@ class TrainDataset(Dataset):
         else:
             im = item.image
             mask = item.mask
+            print("item shapes:",item.image.shape, item.mask.shape, 'im type:', self.image_provider.image_type)
         im, mask = self.transforms(im, mask)
         # cv2.imshow('w', np.moveaxis(im, 0, -1)[...,:3])
         # cv2.imshow('m', np.squeeze(mask))
         # cv2.waitKey()
+        print('im & mask shape are:', im.shape, mask.shape, '\n')
         return {'image': im, 'mask': mask, 'image_name': item.fn}
 
     def __len__(self):
         return len(self.image_indexes) * max(self.config.epoch_size, 1) # epoch size is len images
-    
-    def is_mixed(self):
-        return type(self.image_provider) == MixedReadingImageProvider
 
     def end_batch(self):
         """Cycles between the different datasets to provide from"""
@@ -120,7 +122,9 @@ class SequentialDataset(Dataset):
         return {'image': im, 'startx': sx, 'starty': sy, 'image_name': item.fn}
 
     def __len__(self):
-        return len(self.good_tiles)
+        if self.image_provider.image_type == TiffImageType:
+            return len(self.good_tiles)
+        return len(self.image_provider)
 
 
 class ValDataset(SequentialDataset):
@@ -132,14 +136,19 @@ class ValDataset(SequentialDataset):
         self.keys.add('mask')
 
     def __getitem__(self, idx):
-        im_idx, sx, sy = self.good_tiles[idx]
-        item = self.image_provider[im_idx]
-
-        im = self.cropper.crop_image(item.image, sx, sy)
-        mask = self.cropper.crop_image(item.mask, sx, sy)
+        to_return = {}
+        if self.image_provider.image_type == TiffImageType:
+            im_idx, sx, sy = self.good_tiles[idx]
+            item = self.image_provider[im_idx]
+            im = self.cropper.crop_image(item.image, sx, sy)
+            mask = self.cropper.crop_image(item.mask, sx, sy)
+            to_return = {'startx': sx, 'starty': sy}
+        else:
+            item = self.image_provider[idx]
+            im = item.image
+            mask = item.mask
         # cv2.imshow('w', im[...,:3])
         # cv2.imshow('m', mask)
         # cv2.waitKey()
         im, mask = self.transforms(im, mask)
-        print(im.shape)
-        return {'image': im, 'mask': mask, 'startx': sx, 'starty': sy, 'image_name': item.fn}
+        return {'image': im, 'mask': mask, 'image_name': item.fn, **to_return}

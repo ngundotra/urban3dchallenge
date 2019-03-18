@@ -9,7 +9,7 @@ from dataset.salmap_image import SalImageType
 from dataset.tiff_image import TiffImageType
 from dataset.spacenet_image import TiffSpacenetImageType
 from dataset.crowdai_image import CrowdAIImageType
-from pytorch_utils.train import train
+from pytorch_utils.train import mix_train
 from utils import get_folds, update_config
 import argparse
 import json
@@ -87,15 +87,16 @@ data_infos = [get_training_mappings(data) for data in datasets]
 make_mixed_ds = lambda: MixedReadingImageProvider(data_infos)
 
 FOLDS = 5
+WORKERS = 2
 def train_stage0():
     """
     heat up weights for 5 epochs
     """
     ds = make_mixed_ds()
 
-    folds = get_folds(ds, FOLDS)
-    num_workers = 0 if os.name == 'nt' else 8
-    train(ds, folds, config, num_workers=num_workers, transforms=augment_flips_color)
+    num_workers = 0 if os.name == 'nt' else WORKERS
+    tfs = [None if type(prov)==ReadingImageProvider else augment_flips_color for prov in ds.ds_providers]
+    mix_train(ds.ds_providers, config, num_workers=num_workers, transforms=tfs)
 
 
 def train_stage1(sal_map:bool, three=False):
@@ -106,9 +107,9 @@ def train_stage1(sal_map:bool, three=False):
     """
     ds = make_mixed_ds()
 
-    folds = get_folds(ds, FOLDS)
-    num_workers = 0 if os.name == 'nt' else 8
-    train(ds, folds, config, num_workers=num_workers, transforms=augment_flips_color, num_channels_changed=not three)
+    tfs = [None if type(prov)==ReadingImageProvider else augment_flips_color for prov in ds.ds_providers]
+    num_workers = 0 if os.name == 'nt' else WORKERS
+    mix_train(ds.ds_providers, config, num_workers=num_workers, transforms=tfs, num_channels_changed=not three)
 
 
 def train_stage2(sal_map:bool, three=False):
@@ -118,9 +119,9 @@ def train_stage2(sal_map:bool, three=False):
     """
     ds = make_mixed_ds()
 
-    folds = get_folds(ds, FOLDS)
-    num_workers = 0 if os.name == 'nt' else 8
-    train(ds, folds, config, num_workers=num_workers, transforms=augment_flips_color)
+    tfs = [None if type(prov)==ReadingImageProvider else augment_flips_color for prov in ds.ds_providers]
+    num_workers = 0 if os.name == 'nt' else WORKERS
+    mix_train(ds.ds_providers, config, num_workers=num_workers, transforms=tfs)
 
 
 if __name__ == "__main__":

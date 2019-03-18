@@ -196,17 +196,25 @@ class PytorchTrain:
 
     def _run_one_epoch_mixed(self, epoch, loaders, training=True):
         """Switch between loaders for training, lord help me for validation...."""
+        avg_meter = defaultdict(float)
+        tqs = []
         pbars = []
         counts = []
-        for idx, load in enumerate(loaders):
-            pbars.append(tqdm(enumerate(loader), total=len(loader), desc="Epoch {}{}-{}".format(epoch, ' eval' if not training else "", idx), ncols=0))
+        for idx, loader in enumerate(loaders):
+            tqs.append(tqdm(enumerate(loader), 
+                total=len(loader), desc="Epoch {}{}-{}".format(epoch, ' eval' if not training else "", idx), ncols=0))
+            pbars.append(iter(tqs[-1]))
             counts.append(0)
 
-        to_choose = [pbars[i] if counts[i] < len(pbars[i]) for i in range(len(pbars))]
+        # To keep track of num iters in epoch overall
         actual_idx = 0
+        # filter out datasets that have been saturated
+        to_choose = [i for i in range(len(pbars)) if counts[i] < len(loaders[i])]
         while len(to_choose) > 0:
-            curr_pbar = np.random.choice(to_choose)
-            data = next(curr_pbar)
+            ds_idx = np.random.choice(to_choose)
+            curr_pbar = pbars[ds_idx]
+            # pdb.set_trace()
+            _, data = next(curr_pbar)
 
             self.callbacks.on_batch_begin(actual_idx)
 
@@ -220,13 +228,15 @@ class PytorchTrain:
                     if self.hard_negative_miner.need_iter():
                         self._make_step(self.hard_negative_miner.cache, training)
                         self.hard_negative_miner.invalidate_cache()
-
-            pbar.set_postfix(**{k: "{:.5f}".format(v / (actual_idx + 1)) for k, v in avg_meter.items()})
+            
+            tqs[ds_idx].set_postfix(**{k: "{:.5f}".format(v / (actual_idx + 1)) for k, v in avg_meter.items()})
 
             self.callbacks.on_batch_end(actual_idx)
-            # SUPER IMPORTANT for MixedReadingImageProviders
-            # This allows the mixed providers to switch the dataset it's providing from
-            # loader.dataset.end_batch()
+            actual_idx += 1
+            # Increment the number of times we've seen a dataset
+            counts[ds_idx] += 1 
+            to_choose = [i for i in range(len(pbars)) if counts[i] < len(loaders[i])]
+        return {k: v / len(loader) for k, v in avg_meter.items()}
 
     def _make_step(self, data, training):
         images = data['image']
@@ -235,10 +245,7 @@ class PytorchTrain:
         meter, ypreds = self.estimator.make_step_itersize(images, ytrues, training, self.metrics)
 
         return meter, ypreds
-
-    def switch_ds():
-        if self.mixed_ds():
-            self.ds_idx = np.random.choice(self.)
+    
     def fit(self, train_loader, val_loader, nb_epoch):
         self.callbacks.on_train_begin()
 
@@ -260,6 +267,26 @@ class PytorchTrain:
 
         self.callbacks.on_train_end()
 
+    def fit_mixed(self, train_loaders, val_loaders, nb_epoch):
+        self.callbacks.on_train_begin()
+
+        for epoch in range(self.estimator.start_epoch, nb_epoch):
+            self.callbacks.on_epoch_begin(epoch)
+            if self.estimator.lr_scheduler is not None:
+                self.estimator.lr_scheduler.step(epoch)
+
+            # Flip between saving the weight coefficients when training & when evaluating
+            # self.estimator.model.train()
+            # self.metrics_collection.train_metrics = self._run_one_epoch_mixed(epoch, train_loaders, training=True)
+            self.estimator.model.eval()
+            self.metrics_collection.val_metrics = self._run_one_epoch_mixed(epoch, val_loaders, training=False)
+
+            self.callbacks.on_epoch_end(epoch)
+
+            if self.metrics_collection.stop_training:
+                break
+
+        self.callbacks.on_train_end()
 
 def train(ds, folds, config, num_workers=0, transforms=None, skip_folds=None, num_channels_changed=False):
     """
@@ -295,20 +322,69 @@ def train(ds, folds, config, num_workers=0, transforms=None, skip_folds=None, nu
                                callbacks=callbacks,
                                hard_negative_miner=None)
 
-        if type(ds) == MixedReadingImageProvider:
-            ds.set_batch_size(config.batch_size)
-            shuffle = False
         train_loader = PytorchDataLoader(TrainDataset(ds, train_idx, config, transforms=transforms),
                                          batch_size=config.batch_size,
-                                         shuffle=shuffle,
+                                         shuffle=True,
                                          drop_last=True,
                                          num_workers=num_workers,
                                          pin_memory=True)
         val_loader = PytorchDataLoader(ValDataset(ds, val_idx, config, transforms=None),
                                        batch_size=config.batch_size,
-                                       shuffle=shuffle,
+                                       shuffle=False,
                                        drop_last=False,
                                        num_workers=num_workers,
                                        pin_memory=True)
 
         trainer.fit(train_loader, val_loader, config.nb_epoch)
+
+def mix_train(datasets, config, num_workers=0, transforms=None, skip_folds=None, num_channels_changed=False):
+    """
+    here we construct all needed structures and specify parameters
+    """
+    os.makedirs(os.path.join(config.results_dir, 'weights'), exist_ok=True)
+    os.makedirs(os.path.join(config.results_dir, 'logs'), exist_ok=True)
+
+    # Create the model
+    save_path = os.path.join(config.results_dir, 'weights', config.folder)
+    model = models[config.network](num_classes=1, num_channels=config.num_channels)
+    estimator = Estimator(model, optimizers[config.optimizer], losses[config.loss], save_path,
+                            iter_size=config.iter_size, lr=config.lr, num_channels_changed=num_channels_changed)
+
+    callbacks = [
+        StepLR(config.lr, num_epochs_per_decay=30, lr_decay_factor=0.1),
+        ModelSaver(1, ("fold_best.pth"), best_only=True),
+        CheckpointSaver(1, ("fold_checkpoint.pth")),
+        # EarlyStopper(10),
+        TensorBoard(os.path.join(config.results_dir, 'logs', config.folder, 'fold'))
+    ]
+    metrics = [('dice', dice), ('bce', binary_cross_entropy), ('dice round', dice_round)]
+    trainer = PytorchTrain(estimator,
+                            fold='*', # * is just for fun, since we don't use folds with mixed :P
+                            metrics=metrics,
+                            callbacks=callbacks,
+                            hard_negative_miner=None)
+    # Create the datasets
+    train_loaders = []
+    val_loaders = []
+    for i, ds in enumerate(datasets):
+        # actually create the datasets
+        if transforms:
+            tfs = transforms[i]
+        else:
+            tfs = None
+        train_loader = PytorchDataLoader(TrainDataset(ds, list(range(len(ds))), config, transforms=tfs),
+                                         batch_size=config.batch_size,
+                                         shuffle=True,
+                                         drop_last=True,
+                                         num_workers=num_workers,
+                                         pin_memory=False)
+        val_loader = PytorchDataLoader(ValDataset(ds, list(range(len(ds))), config, transforms=None),
+                                       batch_size=config.batch_size,
+                                       shuffle=True,
+                                       drop_last=False,
+                                       num_workers=num_workers,
+                                       pin_memory=False)
+        train_loaders.append(train_loader)
+        val_loaders.append(val_loader)
+
+    trainer.fit_mixed(train_loaders, val_loaders, config.nb_epoch)

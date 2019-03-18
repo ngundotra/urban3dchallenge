@@ -62,19 +62,21 @@ class TiffSpacenetImageType(AbstractImageType):
         """Apply percent-based image preprocessing to shape range from [0, 2^11] to [0, 1]"""
         if self.src_ds is None:
             self.src_ds = gdal.Open(os.path.join(self.paths['images'], self.fn), gdal.GA_ReadOnly)
-        last_channel = self.src_ds.RasterCount + (1 if not self.has_alpha else 0)
-        arr = [self.src_ds.GetRasterBand(idx).ReadAsArray() for idx in range(1, last_channel)]
+            last_channel = self.src_ds.RasterCount + (1 if not self.has_alpha else 0)
+            arr = [self.src_ds.GetRasterBand(idx).ReadAsArray() for idx in range(1, last_channel)]
 
-        arr = np.dstack([(a).astype(np.float32) for a in arr])
-        arr = simplest_cb(arr).astype(np.uint8)
+            arr = np.dstack([(a).astype(np.float32) for a in arr])
+            arr = cv2.resize(arr, (512, 512))
+            self.src_ds = simplest_cb(arr).astype(np.uint8)
         # Max is 255, min is 0
-        return self.finalyze(arr)
+        return self.src_ds
 
     def read_mask(self):
         if self.mask_ds is None:
             self.mask_ds = np.load(os.path.join(self.paths['masks'], self.fn_mapping['masks'](self.fn)))
-        self.mask_ds = (self.mask_ds > 0).astype(np.uint8) * 255
-        return self.finalyze(self.mask_ds)
+            self.mask_ds = (self.mask_ds > 0).astype(np.uint8) * 255
+            self.mask_ds = cv2.resize(self.mask_ds, (512, 512))
+        return self.mask_ds
 
     def finalyze(self, data):
         return self.reflect_border(data)
