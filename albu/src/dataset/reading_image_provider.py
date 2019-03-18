@@ -60,11 +60,8 @@ class MixedReadingImageProvider():
         self.ds_providers = []
         for data_info in datasets:
             self.ds_providers.append(ReadingImageProvider(**data_info))
-        print(len(self), self.get_splits())
 
     def __getitem__(self, item):
-        # OOF, the asynchronous loading messes up logic quite a bit
-        print(item)
         total = 0
         for ds in self.ds_providers:
             if item < total + len(ds):

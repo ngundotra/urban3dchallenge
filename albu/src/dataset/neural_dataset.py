@@ -48,7 +48,6 @@ class TrainDataset(Dataset):
         item = self.image_provider[im_idx]
         # The following line allows certain ImageProviders to avoid cropping their images
         if self.image_provider.image_type == TiffImageType:
-            print("croppin'!")
             sx, sy = self.cropper.random_crop_coords()
             if self.cropper.use_crop and self.image_provider.has_alpha:
                 for i in range(10):
@@ -64,25 +63,17 @@ class TrainDataset(Dataset):
         else:
             im = item.image
             mask = item.mask
-            print("item shapes:",item.image.shape, item.mask.shape, 'im type:', self.image_provider.image_type)
+            # print("item shapes:",item.image.shape, item.mask.shape, 'im type:', self.image_provider.image_type)
         im, mask = self.transforms(im, mask)
         # cv2.imshow('w', np.moveaxis(im, 0, -1)[...,:3])
         # cv2.imshow('m', np.squeeze(mask))
         # cv2.waitKey()
-        print('im & mask shape are:', im.shape, mask.shape, '\n')
+        # print('im & mask shape are:', im.shape, mask.shape, '\n')
         return {'image': im, 'mask': mask, 'image_name': item.fn}
 
     def __len__(self):
         return len(self.image_indexes) * max(self.config.epoch_size, 1) # epoch size is len images
 
-    def end_batch(self):
-        """Cycles between the different datasets to provide from"""
-        if self.is_mixed():
-            splits = self.image_provider.get_splits()
-            # s = np.random.choice(len(self.image_provider.ds_providers), p=np.array(splits)/len(self.image_provider)) 
-            s = np.random.choice(len(self.image_provider.ds_providers))
-            self.image_provider.set_split(s)
-            print("New split is at:", self.image_provider.ds_idx)
 
 class SequentialDataset(Dataset):
     """
@@ -93,7 +84,6 @@ class SequentialDataset(Dataset):
         self.good_tiles = []
         self.init_good_tiles()
         self.keys.update({'sy', 'sx'})
-        print(self.transforms)
 
     def init_good_tiles(self):
         self.good_tiles = []
