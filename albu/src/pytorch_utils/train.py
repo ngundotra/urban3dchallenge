@@ -110,7 +110,7 @@ class Estimator:
         for input, target in zip(inputs, targets):
             input = torch.autograd.Variable(input.cuda(async=True)) 
             target = torch.autograd.Variable(target.cuda(async=True))
-            print("input shape is:", input.shape, "target shape is:", target.shape)
+            # print("input shape is:", input.shape, "target shape is:", target.shape)
             if not training:
                 with torch.no_grad():
                     output = self.model(input)
@@ -276,8 +276,8 @@ class PytorchTrain:
                 self.estimator.lr_scheduler.step(epoch)
 
             # Flip between saving the weight coefficients when training & when evaluating
-            # self.estimator.model.train()
-            # self.metrics_collection.train_metrics = self._run_one_epoch_mixed(epoch, train_loaders, training=True)
+            self.estimator.model.train()
+            self.metrics_collection.train_metrics = self._run_one_epoch_mixed(epoch, train_loaders, training=True)
             self.estimator.model.eval()
             self.metrics_collection.val_metrics = self._run_one_epoch_mixed(epoch, val_loaders, training=False)
 

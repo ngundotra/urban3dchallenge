@@ -15,25 +15,8 @@ import argparse
 import json
 from config import Config
 
-parser = argparse.ArgumentParser()
-# This is the path to the JSON that he uses to parse the options
-# for training a net
-parser.add_argument('config_path')
-args = parser.parse_args()
-with open(args.config_path, 'r') as f:
-    cfg = json.load(f)
-    if len(cfg['datasets']) == 1:
-        raise ValueError("USE REGULAR TRAIN WHEN TRAINING ONLY ON 1 DATASET")
-    elif len(cfg['datasets']) >= 4:
-        raise ValueError("TOO MANY DATASETS PASSED IN, ONLY SUPPORT <= 3")
-    datasets = cfg['datasets']
-    # Note Sal_map usage is a property that should affect all datasets,
-    # since it implies that the model is using 4 channels
-    sal_map = cfg.get("sal_map", False)
-cfg.pop("datasets")
-config = Config(**cfg)
 
-def get_training_mappings(data_info):
+def get_training_mappings(data_info, sal_map=False):
     """Returns the paths & fn_mappings for a given dataset & data_dir"""
     ds_name, data_dir = data_info['name'], data_info['dataset_path']
     limit = data_info['limit']
@@ -82,12 +65,6 @@ def get_training_mappings(data_info):
     rip_info = {'paths': paths, 'fn_mapping': fn_mapping, 'image_type': image_type,
                  'image_suffix': image_suffix, "limit": limit}
     return rip_info
-
-data_infos = [get_training_mappings(data) for data in datasets]
-make_mixed_ds = lambda: MixedReadingImageProvider(data_infos)
-
-FOLDS = 5
-WORKERS = 2
 def train_stage0():
     """
     heat up weights for 5 epochs
@@ -125,6 +102,28 @@ def train_stage2(sal_map:bool, three=False):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    # This is the path to the JSON that he uses to parse the options
+    # for training a net
+    parser.add_argument('config_path')
+    args = parser.parse_args()
+    with open(args.config_path, 'r') as f:
+        cfg = json.load(f)
+    if len(cfg['datasets']) == 1:
+        raise ValueError("USE REGULAR TRAIN WHEN TRAINING ONLY ON 1 DATASET")
+    elif len(cfg['datasets']) >= 4:
+        raise ValueError("TOO MANY DATASETS PASSED IN, ONLY SUPPORT <= 3")
+    datasets = cfg.pop('datasets')
+
+    sal_map = cfg.get("sal_map", False)
+    data_infos = [get_training_mappings(data, sal_map) for data in datasets]
+    make_mixed_ds = lambda: MixedReadingImageProvider(data_infos)
+
+    FOLDS = 5
+    WORKERS = 2
+    # Note Sal_map usage is a property that should affect all datasets,
+    # since it implies that the model is using 4 channels
+    config = Config(**cfg)
     three = (config.num_channels == 3)
     num_epochs = config.nb_epoch
     config = update_config(config, num_channels=3, nb_epoch=5)
