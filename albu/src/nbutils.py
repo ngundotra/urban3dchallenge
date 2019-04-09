@@ -1,3 +1,8 @@
+"""nbutils.py
+This file was created to store some of the more gross functions I had to write when doing early Notebooking
+for this project. If you don't like how it's structured, you can email complaints to /dev/null. Hahaha, actually
+I'm sorry if you do have complaints."""
+
 import torch
 import cv2
 import georaster

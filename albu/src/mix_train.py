@@ -1,3 +1,9 @@
+"""mix_train.py
+This file replaces train.py for training a model on multiple different datasets (in preprocessing, in size, etc).
+There are correspondingly changes in the input configuration file. An example is given.
+Run this file, with the example from ../resnet34_1x1080_mixed_RGB.json to see how this runs.
+
+You can specify the % of each dataset you want to train your model on in the config file."""
 import torch
 import os
 
